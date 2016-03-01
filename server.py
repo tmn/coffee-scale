@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
 
 import asyncio
@@ -18,30 +17,40 @@ PRODUCT_ID = 0x8005
 
 WEBHOOK = 'https://hooks.slack.com/services/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'
 
+connected = set()
+
 @asyncio.coroutine
 def weight_listener(websocket, path):
+    global connected
+
     scale = Scale(VENDOR_ID, PRODUCT_ID)
     empty = True
 
+    connected.add(websocket)
+
     while True:
         grams = scale.read()
-        message = ''
 
         if scale.is_empty() and not empty:
             empty = True
             msg = 'Tomt for :coffee: :disappointed:'
             #requests.post(WEBHOOK, json={'text': msg})
-            yield from websocket.send(msg)
+            for ws in connected.copy():
+                try:
+                    yield from ws.send(msg)
+                except:
+                    connected.remove(ws)
 
         elif scale.has_new_coffee() and empty:
             empty = False
             msg = 'Ny :coffee: !!'
+            task = None
             #requests.post(WEBHOOK, json={'text': msg})
-            yield from websocket.send(msg)
-
-        else:
-            ## meh logic blah wuuop
-            pass
+            for ws in connected.copy():
+                try:
+                    yield from ws.send(msg)
+                except:
+                    connected.remove(ws)
 
         yield from asyncio.sleep(0.1)
 
@@ -56,5 +65,3 @@ if __name__ == "__main__":
 
     asyncio.get_event_loop().run_until_complete(start_server)
     asyncio.get_event_loop().run_forever()
-
-    server()
