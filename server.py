@@ -1,10 +1,14 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #-*- coding: UTF-8 -*-
-import sys
-from scale import reader, reader_stub
-from socketIO_client import SocketIO, SocketIOPacketError, SocketIOError
-from time import sleep
+
+import asyncio
 import os
+import requests
+import sys
+import websockets
+
+from scale.reader import Scale
+from time import sleep
 
 env = os.getenv('PYTHON_ENV', 'production')
 
@@ -12,44 +16,34 @@ env = os.getenv('PYTHON_ENV', 'production')
 VENDOR_ID = 0x0922
 PRODUCT_ID = 0x8005
 
-reattempt_in = 10
-max_total_attempt_seconds = 60
+WEBHOOK = 'https://hooks.slack.com/services/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'
 
-interval_ms = 100
+@asyncio.coroutine
+def weight_listener(websocket, path):
+    scale = Scale(VENDOR_ID, PRODUCT_ID)
+    empty = True
 
-def get_read():
-    obj = reader if env is 'production' else reader_stub
-    return obj.establish(VENDOR_ID, PRODUCT_ID)
+    while True:
+        grams = scale.read()
+        message = ''
 
-def send():
-    global reattempt_in
-    read = get_read()
-    try:
-        print "Trying to connect to ws://%s:%s" % (server, port)
-        with SocketIO(server, port) as socketIO:
-            reattempt_in = 10
-            print "Connected. Starting emitting."
-            try:
-                while True:
-                    grams = read()
-                    print "Emitting data (%s grams)" % grams
-                    socketIO.emit('weight', {'grams': grams})
-                    sleep(float(interval_ms) / 1000)
-            except SocketIOPacketError as e:
-                resend()
-    except SocketIOError as e:
-        resend()
+        if scale.is_empty() and not empty:
+            empty = True
+            msg = 'Tomt for :coffee: :disappointed:'
+            #requests.post(WEBHOOK, json={'text': msg})
+            yield from websocket.send(msg)
 
-def resend():
-    global reattempt_in
+        elif scale.has_new_coffee() and empty:
+            empty = False
+            msg = 'Ny :coffee: !!'
+            #requests.post(WEBHOOK, json={'text': msg})
+            yield from websocket.send(msg)
 
-    if reattempt_in <= max_total_attempt_seconds:
-        print "Disconnected or could not connect to the WS. Trying to reconnect in %s seconds" % reattempt_in
-        sleep(reattempt_in)
-        reattempt_in += 10
-        send()
-    else:
-        print "No more attempts. Please reconnect manually"
+        else:
+            ## meh logic blah wuuop
+            pass
+
+        yield from asyncio.sleep(0.1)
 
 if __name__ == "__main__":
     argv = sys.argv
@@ -57,4 +51,10 @@ if __name__ == "__main__":
 
     server = 'localhost' if num_args < 2 else argv[1]
     port = (int) (3000 if num_args < 3 else argv[2])
-    send()
+
+    start_server = websockets.serve(weight_listener, server, port)
+
+    asyncio.get_event_loop().run_until_complete(start_server)
+    asyncio.get_event_loop().run_forever()
+
+    server()
