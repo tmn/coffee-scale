@@ -8,6 +8,7 @@ import websockets
 
 from scale.reader import Scale
 from time import sleep
+from config import config
 
 env = os.getenv('PYTHON_ENV', 'production')
 
@@ -15,42 +16,64 @@ env = os.getenv('PYTHON_ENV', 'production')
 VENDOR_ID = 0x0922
 PRODUCT_ID = 0x8005
 
-WEBHOOK = 'https://hooks.slack.com/services/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'
-
 connected = set()
+empty = True
+
+@asyncio.coroutine
+def producer():
+    global empty
+    scale = Scale(VENDOR_ID, PRODUCT_ID)
+    message = None
+
+    while True:
+        if scale.is_empty() and not empty:
+            empty = True
+            return 'Tomt for :coffee: :disappointed:'
+        elif scale.has_new_coffee() and empty:
+            empty = False
+            return 'Ny :coffee: !!'
+
+        yield from asyncio.sleep(0.1)
+
+
+@asyncio.coroutine
+def consumer(message):
+    global connected
+
+    ## Listen to incomming stuff
+    ## Handle incomming messages here
+    print('CONSUMER {}'.format(message))
+
 
 @asyncio.coroutine
 def weight_listener(websocket, path):
     global connected
 
-    scale = Scale(VENDOR_ID, PRODUCT_ID)
-    empty = True
-
     connected.add(websocket)
 
     while True:
-        grams = scale.read()
+        listener_task = asyncio.async(websocket.recv())
+        producer_task = asyncio.async(producer())
+        done, pending = yield from asyncio.wait(
+            [listener_task, producer_task],
+            return_when=asyncio.FIRST_COMPLETED)
 
-        if scale.is_empty() and not empty:
-            empty = True
-            msg = 'Tomt for :coffee: :disappointed:'
-            #requests.post(WEBHOOK, json={'text': msg})
+        if listener_task in done:
+            message = listener_task.result()
+            yield from consumer(message)
+        else:
+            listener_task.cancel()
+
+        if producer_task in done:
+            message = producer_task.result()
             for ws in connected.copy():
+                requests.post(utils.WEBHOOK, json={'text': message})
                 try:
-                    yield from ws.send(msg)
+                    yield from ws.send(message)
                 except:
                     connected.remove(ws)
-
-        elif scale.has_new_coffee() and empty:
-            empty = False
-            msg = 'Ny :coffee: !!'
-            task = None
-            #requests.post(WEBHOOK, json={'text': msg})
-            for ws in connected.copy():
-                try:
-                    yield from ws.send(msg)
-                except:
-                    connected.remove(ws)
+        else:
+            producer_task.cancel()
 
         yield from asyncio.sleep(0.1)
 
