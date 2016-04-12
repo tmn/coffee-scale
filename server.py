@@ -66,8 +66,8 @@ def weight_listener(websocket, path):
 
         if producer_task in done:
             message = producer_task.result()
+            # requests.post(utils.WEBHOOK, json={'text': message})
             for ws in connected.copy():
-                requests.post(utils.WEBHOOK, json={'text': message})
                 try:
                     yield from ws.send(message)
                 except:
@@ -76,6 +76,7 @@ def weight_listener(websocket, path):
             producer_task.cancel()
 
         yield from asyncio.sleep(0.1)
+
 
 if __name__ == "__main__":
     argv = sys.argv
