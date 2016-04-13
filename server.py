@@ -17,9 +17,11 @@ env = os.getenv('PYTHON_ENV', 'production')
 VENDOR_ID = 0x0922
 PRODUCT_ID = 0x8005
 
-empty = True
+
 times_full = 0
 times_empty = 0
+scale = Scale(VENDOR_ID, PRODUCT_ID)
+empty = scale.is_empty()
 
 # create logger
 logging.basicConfig(filename='/var/log/coffeescale.log',level=logging.DEBUG,
