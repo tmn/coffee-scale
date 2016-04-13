@@ -19,7 +19,7 @@ PRODUCT_ID = 0x8005
 
 empty = True
 times_full = 0
-
+times_empty = 0
 
 # create logger
 logging.basicConfig(filename='/var/log/coffeescale.log',level=logging.DEBUG,
@@ -39,7 +39,7 @@ def producer():
 
 @asyncio.coroutine
 def weight_listener(hook):
-    global empty, times_full
+    global empty, times_full, times_empty
 
     logger.info("Listening to weight. Empty:{0}".format(empty))
 
@@ -49,11 +49,14 @@ def weight_listener(hook):
         if (result[0] != empty):
             if (result[0] == False):
                 times_full = times_full + 1
+                times_empty = 0
                 if (times_full >= 3):
                     __set_empty_and_post(hook, result)
             else:
                 times_full = 0
-                __set_empty_and_post(hook, result)
+                times_empty = times_empty + 1
+                if (times_empty >= 3):
+                    __set_empty_and_post(hook, result)
 
         yield from asyncio.sleep(3.0)
 
