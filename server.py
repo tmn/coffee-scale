@@ -22,7 +22,8 @@ times_full = 0
 
 
 # create logger
-logging.basicConfig(filename='/var/log/coffeescale.log',level=logging.DEBUG)
+logging.basicConfig(filename='/var/log/coffeescale.log',level=logging.DEBUG,
+                    format='%(asctime)s %(message)s')
 logger = logging.getLogger('server')
 
 def producer():
