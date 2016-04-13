@@ -1,7 +1,10 @@
 import os, time
 import usb.core
 import usb.util
+import logging
 from sys import exit
+
+logger = logging.getLogger('reader')
 
 class Scale:
     weight_empty_value = None
@@ -61,6 +64,8 @@ class Scale:
         DATA_MODE_OUNCES = 11
         grams = 0
 
+        logger.debug("Got the following data {0}".format(data))
+
         if data != None:
             raw_weight = data[4] + data[5] * 256
 
@@ -71,8 +76,10 @@ class Scale:
             elif data[2] == DATA_MODE_GRAMS:
                 grams = raw_weight
 
+            logger.debug("Returned the following grams: {0}".format(grams))
             return grams
 
+        logger.debug("Returned 0 grams")
         return 0
 
 
@@ -88,6 +95,7 @@ class Scale:
             try:
                 data = self.device.read(endpoint.bEndpointAddress, endpoint.wMaxPacketSize)
             except usb.core.USBError as e:
+                logger.warning("Got exception from weight. {0}".format(e))
                 data = None
                 if e.args == ('Operation timed out',):
                     attempts -= 1

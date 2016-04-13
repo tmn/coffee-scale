@@ -5,6 +5,7 @@ import os
 import requests
 import sys
 import websockets
+import logging
 
 from scale.reader_stub import Scale
 from time import sleep
@@ -18,6 +19,11 @@ PRODUCT_ID = 0x8005
 
 empty = True
 times_full = 0
+
+
+# create logger
+logging.basicConfig(filename='/var/log/coffeescale.log',level=logging.DEBUG)
+logger = logging.getLogger('server')
 
 def producer():
     global empty
@@ -34,25 +40,26 @@ def producer():
 def weight_listener(hook):
     global empty, times_full
 
-    print("Listening to weight")
+    logger.info("Listening to weight. Empty:{0}".format(empty))
 
     while True:
         result = producer()
-
+        logger.info("Got result: {0} and empty is {1}".format(result[0], empty))
         if (result[0] != empty):
             if (result[0] == False):
                 times_full = times_full + 1
-                if (times_full >= 10):
+                if (times_full >= 3):
                     __set_empty_and_post(hook, result)
             else:
                 times_full = 0
                 __set_empty_and_post(hook, result)
 
-        yield from asyncio.sleep(1.0)
+        yield from asyncio.sleep(3.0)
 
 def __set_empty_and_post(hook, result):
     global empty
     empty = result[0]
+    logger.info("Empty changed to {0}".format(empty))
     requests.post(hook, json = {'text':result[1]})
 
 if __name__ == "__main__":

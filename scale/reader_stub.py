@@ -1,7 +1,10 @@
 import random
+import logging
 
 __max = 300
 __acc = 0
+
+logger = logging.getLogger('reader_stub')
 
 class Scale:
     def __init__(self, arg, meh):
