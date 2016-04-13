@@ -21,20 +21,20 @@ class Scale:
 
         self.device = self.__connect()
 
-    def __read(self):
+    def read(self):
         if self.device is not None:
             data = self.__analyzeData(self.__grabData())
             self.__disconnect()
             return data
 
     def is_empty(self):
-        if self.__read() <= self.weight_empty_value:
+        if self.read() <= self.weight_empty_value:
             return True
 
         return False
 
     def has_new_coffee(self):
-        if self.__read() >= self.weight_new_coffee_value:
+        if self.read() >= self.weight_new_coffee_value:
             return True
 
         return False
