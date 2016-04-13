@@ -6,10 +6,13 @@ import requests
 import sys
 import websockets
 import logging
+from threading import Thread
 
 from scale.reader_stub import Scale
+from api.api import ApiRequestHandler
 from time import sleep
 from config import config
+from http.server import HTTPServer
 
 env = os.getenv('PYTHON_ENV', 'production')
 
@@ -29,8 +32,7 @@ logging.basicConfig(filename='/var/log/coffeescale.log',level=logging.DEBUG,
 logger = logging.getLogger('server')
 
 def producer():
-    global empty
-    scale = Scale(VENDOR_ID, PRODUCT_ID)
+    global empty, scale
     message = None
     if scale.is_empty() and not empty:
         return (True,'Tomt for :coffee: :disappointed:')
@@ -68,11 +70,27 @@ def __set_empty_and_post(hook, result):
     logger.info("Empty changed to {0}".format(empty))
     requests.post(hook, json = {'text':result[1]})
 
+def run():
+  logger.info('starting server...')
+
+  # Server settings
+  # Choose port 8080, for port 80, which is normally used for a http server, you need root access
+  server_address = ('', 8080)
+  handler = ApiRequestHandler
+  handler.scale = scale
+  httpd = HTTPServer(server_address, handler)
+  logger.info('running server...')
+  httpd.serve_forever()
+
 if __name__ == "__main__":
+    # Start API Server
+    thread = Thread(target = run)
+    thread.start()
+
+    # Setup Slack webhook check loop
     argv = sys.argv
-    num_args = len(argv)
-
     hook = argv[1]
-
     asyncio.get_event_loop().run_until_complete(weight_listener(hook))
     asyncio.get_event_loop().run_forever()
+
+    thread.join()
